@@ -1,0 +1,74 @@
+{
+    // ==========================================================================
+    // VS Code Launch Configurations for Task Assistant API
+    // ==========================================================================
+    //
+    // This file tells VS Code HOW to run and debug the application.
+    // Each entry in "configurations" is a different way to start the app.
+    //
+    // To use: Press F5, or go to Run > Start Debugging, or click the green
+    // play button in the Run and Debug sidebar (Ctrl+Shift+D).
+    //
+    // Prerequisites:
+    //   1. Install the Python extension for VS Code (ms-python.python)
+    //   2. Run "uv sync" in the terminal to install dependencies
+    //   3. VS Code should auto-detect the .venv — if not, press Ctrl+Shift+P
+    //      and search "Python: Select Interpreter", then choose the one in .venv
+    //
+    "version": "0.2.0",
+    "configurations": [
+        {
+            // --- Profile 1: Debug the API Server ---
+            // This is the main one you'll use. It starts the FastAPI server
+            // with the debugger attached, so you can set breakpoints, inspect
+            // variables, and step through code line by line.
+            "name": "Debug: FastAPI Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--reload",
+                "--host", "0.0.0.0",
+                "--port", "8000"
+            ],
+            "jinja": true,
+            "justMyCode": true,
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            // --- Profile 2: Debug without --reload ---
+            // The --reload flag can sometimes interfere with the debugger
+            // (breakpoints not hitting, debugger disconnecting). If that
+            // happens, use this profile instead. The only downside is you
+            // have to restart manually (Ctrl+Shift+F5) after code changes.
+            "name": "Debug: FastAPI (no reload)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--host", "0.0.0.0",
+                "--port", "8000"
+            ],
+            "jinja": true,
+            "justMyCode": true,
+            "console": "integratedTerminal"
+        },
+        {
+            // --- Profile 3: Debug the current file ---
+            // Useful for running a single Python file in isolation, for example
+            // if you create a test script or want to experiment with a module.
+            // Opens whatever .py file you currently have focused in the editor.
+            "name": "Debug: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "justMyCode": true,
+            "console": "integratedTerminal"
+        }
+    ]
+}
