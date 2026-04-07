@@ -21,8 +21,9 @@ Before you start, make sure you have:
 
 1. **VS Code** installed
 2. **Python extension** installed — search "Python" in the Extensions sidebar (`Ctrl+Shift+X`) and install the one by Microsoft (`ms-python.python`)
-3. **Dependencies installed** — run `uv sync` in the terminal
-4. **Python interpreter selected** — VS Code should auto-detect the `.venv` folder. If it doesn't:
+3. **uv installed** — this is a global system tool (not a Python package). If `uv --version` doesn't work in your terminal, see [DEVELOPMENT.md](DEVELOPMENT.md#install-uv-one-time-setup) for install instructions.
+4. **Dependencies installed** — run `uv sync` in the terminal
+5. **Python interpreter selected** — VS Code should auto-detect the `.venv` folder. If it doesn't:
    - Press `Ctrl+Shift+P` to open the Command Palette
    - Type "Python: Select Interpreter"
    - Choose the interpreter inside `.venv` (it will look something like `.venv\Scripts\python.exe`)

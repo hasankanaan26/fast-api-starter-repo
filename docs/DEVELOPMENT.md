@@ -4,6 +4,31 @@ This guide is for project maintainers — setting up the project locally, managi
 
 ---
 
+## Install uv (One-Time Setup)
+
+uv is the tool that manages Python, packages, and virtual environments for this project. It is installed **globally on your system** (not inside a virtual environment) — think of it like Git or Docker: a tool you install once and use across all your projects.
+
+```bash
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+After installing, **restart your terminal** (close and reopen it), then verify it works:
+
+```bash
+uv --version
+# Should print something like: uv 0.6.x
+```
+
+> **Do NOT install uv with `pip install uv`** — that would install it inside a virtual environment, which defeats the purpose. uv manages virtual environments, so it needs to live outside of them. Use the install commands above instead.
+
+> **Do NOT install Python separately** — uv downloads and manages the correct Python version automatically based on the `.python-version` file in the project.
+
+---
+
 ## Local Setup from Scratch
 
 ```bash
