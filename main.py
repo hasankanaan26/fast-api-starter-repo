@@ -17,7 +17,7 @@ Usage:
 """
 
 from fastapi import FastAPI
-from app.routers import tasks
+from app.routers import tasks, chat
 
 
 # Create the FastAPI application instance.
@@ -35,6 +35,10 @@ app = FastAPI(
 # we organize them into separate files (routers). This keeps the code clean and modular.
 # The tasks router adds all the /tasks/* endpoints (create, read, update, delete, search).
 app.include_router(tasks.router)
+
+# Register the chat router — adds POST /chat, which proxies messages to a local
+# Ollama model using the OLLAMA_BASE_URL and OLLAMA_MODEL values from .env.
+app.include_router(chat.router)
 
 
 # The @app.get("/health") line is a "decorator" — it tells FastAPI:
