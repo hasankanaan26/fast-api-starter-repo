@@ -17,7 +17,8 @@ Usage:
 """
 
 from fastapi import FastAPI
-from app.routers import tasks, chat
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import tasks, chat, assignees
 
 
 # Create the FastAPI application instance.
@@ -30,11 +31,28 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Enable CORS so the static HTML UI (served from a separate origin, e.g. a
+# local file or a dev server on a different port) can call these endpoints
+# from the browser. For a local-only dev tool we allow everything; tighten
+# this list before deploying anywhere public.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Register the tasks router with the app.
 # A "router" is a group of related endpoints. Instead of defining every route in this file,
 # we organize them into separate files (routers). This keeps the code clean and modular.
 # The tasks router adds all the /tasks/* endpoints (create, read, update, delete, search).
 app.include_router(tasks.router)
+
+# Register the assignees router — adds the /assignees/* endpoints for managing
+# the people that tasks can be assigned to. Tasks reference assignees by ID
+# via the Task.assignee_id field.
+app.include_router(assignees.router)
 
 # Register the chat router — adds POST /chat, which proxies messages to a local
 # Ollama model using the OLLAMA_BASE_URL and OLLAMA_MODEL values from .env.

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task Assistant</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Task Assistant</h1>
+      <div class="api-status" id="api-status">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">checking API…</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- LEFT: Assignees -->
+      <section class="card">
+        <div class="card-header">
+          <h2>People</h2>
+          <span class="count" id="assignee-count">0</span>
+        </div>
+
+        <form id="assignee-form" class="stacked-form">
+          <label>
+            Name
+            <input id="assignee-name" type="text" placeholder="Jane Doe" required />
+          </label>
+          <label>
+            Email
+            <input id="assignee-email" type="email" placeholder="jane@example.com" required />
+          </label>
+          <button type="submit" class="primary">Add person</button>
+        </form>
+
+        <ul id="assignee-list" class="list"></ul>
+      </section>
+
+      <!-- RIGHT: Tasks -->
+      <section class="card wide">
+        <div class="card-header">
+          <h2>Tasks</h2>
+          <span class="count" id="task-count">0</span>
+        </div>
+
+        <form id="task-form" class="stacked-form">
+          <label>
+            Title
+            <input id="task-title" type="text" placeholder="Buy groceries" required />
+          </label>
+          <label>
+            Description
+            <textarea id="task-description" rows="2" placeholder="Optional details…"></textarea>
+          </label>
+          <label>
+            Assign to
+            <select id="task-assignee">
+              <option value="">— Unassigned —</option>
+            </select>
+          </label>
+          <button type="submit" class="primary">Create task</button>
+        </form>
+
+        <div class="filter-row">
+          <input id="task-search" type="search" placeholder="Search tasks…" />
+          <select id="task-filter-assignee">
+            <option value="">All people</option>
+          </select>
+        </div>
+
+        <ul id="task-list" class="list"></ul>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

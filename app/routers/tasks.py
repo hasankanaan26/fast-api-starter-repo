@@ -22,6 +22,10 @@ Endpoints defined here:
 
 from fastapi import APIRouter, HTTPException, Query
 from app.models import Task, TaskUpdate, TaskResponse
+# Imported for assignee_id validation. We import the module (not the function)
+# to avoid any circular-import edge cases — assignees.py also imports from
+# this module inside a function.
+from app.routers import assignees as assignees_module
 
 # Create a router instance.
 # - prefix="/tasks": All routes in this file will start with /tasks
@@ -95,12 +99,22 @@ def create_task(task: Task):
     # throw an error when we try to read its value before assigning it.
     global next_id
 
+    # If the client supplied an assignee_id, make sure that person actually exists.
+    # We raise 400 (bad request) rather than 404 because the problem is with the
+    # incoming payload, not the /tasks URL itself.
+    if task.assignee_id is not None and not assignees_module.exists_assignee_id(task.assignee_id):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Assignee {task.assignee_id} does not exist",
+        )
+
     # Create a TaskResponse (which includes the ID) from the incoming Task data
     new_task = TaskResponse(
         id=next_id,
         title=task.title,
         completed=task.completed,
-        description=task.description
+        description=task.description,
+        assignee_id=task.assignee_id,
     )
     # Add the new task to our in-memory list
     tasks.append(new_task)
@@ -158,6 +172,19 @@ def get_task(task_id: int):
         GET /tasks/1 → {"id": 1, "title": "Buy milk", ...}
     """
     return find_task_by_id(task_id)
+
+
+@router.get("/by-assignee/{assignee_id}", response_model=list[TaskResponse])
+def list_tasks_by_assignee(assignee_id: int):
+    """
+    List every task assigned to a given assignee.
+
+    Returns 404 if the assignee doesn't exist — this is different from an
+    existing assignee with zero tasks, which correctly returns an empty list.
+    """
+    if not assignees_module.exists_assignee_id(assignee_id):
+        raise HTTPException(status_code=404, detail=f"Assignee {assignee_id} not found")
+    return [t for t in tasks if t.assignee_id == assignee_id]
 
 
 @router.get("/search/", response_model=list[TaskResponse])
@@ -230,6 +257,16 @@ def update_task(task_id: int, updated_task: TaskUpdate):
             # Fields they didn't include are excluded, so we know not to overwrite them.
             update_data = updated_task.model_dump(exclude_unset=True)
 
+            # Validate a newly-supplied assignee_id. We only check when the client
+            # actually sent the field — passing null explicitly is a valid "unassign"
+            # and shouldn't trigger the existence check.
+            if "assignee_id" in update_data and update_data["assignee_id"] is not None:
+                if not assignees_module.exists_assignee_id(update_data["assignee_id"]):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Assignee {update_data['assignee_id']} does not exist",
+                    )
+
             # Create a new TaskResponse starting from the existing task's data,
             # then overwrite only the fields the client provided.
             updated = TaskResponse(
@@ -237,6 +274,7 @@ def update_task(task_id: int, updated_task: TaskUpdate):
                 title=update_data.get("title", existing_task.title),
                 description=update_data.get("description", existing_task.description),
                 completed=update_data.get("completed", existing_task.completed),
+                assignee_id=update_data.get("assignee_id", existing_task.assignee_id),
             )
             # Replace the old task in the list with the updated one
             tasks[index] = updated

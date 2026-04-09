@@ -53,6 +53,21 @@ DescriptionStr = Annotated[
     StringConstraints(strip_whitespace=True, max_length=500),
 ]
 
+# An assignee name: required, 1–100 chars, whitespace stripped.
+# Same rules as TitleStr — a person's name shouldn't be blank or absurdly long.
+NameStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=100),
+]
+
+# An email address: 3–254 chars (RFC 5321 limit), whitespace stripped.
+# We use a plain constrained string rather than EmailStr to avoid an extra
+# dependency (email-validator). The length bounds catch the most obvious bad input.
+EmailStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=3, max_length=254),
+]
+
 
 class Task(BaseModel):
     """
@@ -98,6 +113,12 @@ class Task(BaseModel):
         default=False,
         description="Whether the task has been completed",
     )
+    # Optional link to an assignee. None means "unassigned".
+    # The router validates that this ID actually exists before saving the task.
+    assignee_id: int | None = Field(
+        default=None,
+        description="ID of the assignee responsible for this task (None = unassigned)",
+    )
 
     # model_config provides an example that shows up in the Swagger UI docs,
     # making it easier for users to understand the expected request format.
@@ -108,6 +129,7 @@ class Task(BaseModel):
                     "title": "Buy groceries",
                     "description": "Milk, eggs, and bread from the store",
                     "completed": False,
+                    "assignee_id": 1,
                 }
             ]
         }
@@ -150,6 +172,13 @@ class TaskUpdate(BaseModel):
         default=None,
         description="New completed status (omit to keep current)",
     )
+    # Note: we can't distinguish "omit" from "explicitly set to None" using a plain
+    # Optional field. The router uses model_dump(exclude_unset=True) to detect whether
+    # the client actually sent this field, so passing assignee_id=null DOES unassign.
+    assignee_id: int | None = Field(
+        default=None,
+        description="New assignee ID (omit to keep current, send null to unassign)",
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -157,6 +186,109 @@ class TaskUpdate(BaseModel):
                 {
                     "title": "Buy oat milk instead",
                     "completed": True,
+                    "assignee_id": 2,
+                }
+            ]
+        }
+    }
+
+
+class Assignee(BaseModel):
+    """
+    Input model for creating an assignee.
+
+    An assignee is a person who can be attached to one or more tasks. Like Task,
+    this model is used for incoming request data — the server assigns the ID.
+
+    Validation rules:
+        - name: Required, 1–100 characters, whitespace stripped.
+        - email: Required, 3–254 characters, whitespace stripped. Not a full
+                 RFC-compliant email check, but catches the obviously bad cases.
+
+    Attributes:
+        name (str): The assignee's full name (e.g., "Jane Doe"). Required.
+        email (str): The assignee's email address. Required.
+
+    Example:
+        >>> assignee = Assignee(name="Jane Doe", email="jane@example.com")
+        >>> assignee.name
+        'Jane Doe'
+    """
+
+    name: NameStr = Field(
+        ...,
+        description="The assignee's full name",
+    )
+    email: EmailStr = Field(
+        ...,
+        description="The assignee's email address",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "name": "Jane Doe",
+                    "email": "jane@example.com",
+                }
+            ]
+        }
+    }
+
+
+class AssigneeUpdate(BaseModel):
+    """
+    Input model for updating an existing assignee.
+
+    Mirrors TaskUpdate: every field is optional so clients can send partial
+    updates (e.g. just {"email": "new@example.com"}).
+
+    Attributes:
+        name (str | None): New name, or None to keep the current name.
+        email (str | None): New email, or None to keep the current email.
+    """
+
+    name: NameStr | None = Field(
+        default=None,
+        description="New name for the assignee (omit to keep current)",
+    )
+    email: EmailStr | None = Field(
+        default=None,
+        description="New email for the assignee (omit to keep current)",
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "email": "jane.doe@example.com",
+                }
+            ]
+        }
+    }
+
+
+class AssigneeResponse(Assignee):
+    """
+    Output model for sending an assignee back to the client.
+
+    Extends Assignee by adding the server-assigned "id" field.
+
+    Attributes:
+        id (int): The unique identifier assigned by the server. Starts at 1.
+        name (str): Inherited from Assignee.
+        email (str): Inherited from Assignee.
+    """
+
+    id: int = Field(..., description="Unique assignee identifier assigned by the server")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "id": 1,
+                    "name": "Jane Doe",
+                    "email": "jane@example.com",
                 }
             ]
         }
@@ -196,6 +328,7 @@ class TaskResponse(Task):
                     "title": "Buy groceries",
                     "description": "Milk, eggs, and bread from the store",
                     "completed": False,
+                    "assignee_id": 1,
                 }
             ]
         }
