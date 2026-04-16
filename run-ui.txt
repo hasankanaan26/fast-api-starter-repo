@@ -1,0 +1,2 @@
+cd UI
+py -m http.server 5500

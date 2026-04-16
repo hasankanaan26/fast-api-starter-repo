@@ -15,7 +15,14 @@
       </div>
     </header>
 
-    <main class="layout">
+    <!-- Tab navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="tasks">Tasks</button>
+      <button class="tab" data-tab="analysis">Document Analysis</button>
+    </nav>
+
+    <!-- TAB 1: Task Management (existing) -->
+    <main class="layout tab-content active" id="tab-tasks">
       <!-- LEFT: Assignees -->
       <section class="card">
         <div class="card-header">
@@ -71,6 +78,63 @@
         </div>
 
         <ul id="task-list" class="list"></ul>
+      </section>
+    </main>
+
+    <!-- TAB 2: Document Analysis (new) -->
+    <main class="analysis-layout tab-content" id="tab-analysis">
+      <!-- LEFT: Input panel -->
+      <section class="card">
+        <div class="card-header">
+          <h2>Analyze Document</h2>
+        </div>
+
+        <form id="analysis-form" class="stacked-form">
+          <label>
+            Paste your text
+            <textarea id="analysis-text" rows="8" placeholder="Paste a support ticket, bug report, feature request, billing complaint, or any text you want to analyze…" required></textarea>
+          </label>
+
+          <label>
+            Analysis type
+            <select id="analysis-type">
+              <option value="pipeline">Full Pipeline (classify + extract + summarize)</option>
+              <option value="sentiment">Sentiment Analysis</option>
+              <option value="summarize">Summarize</option>
+              <option value="classify">Classify Ticket</option>
+            </select>
+          </label>
+
+          <div id="summarize-options" class="sub-options" hidden>
+            <label>
+              Max sentences
+              <input id="analysis-max-sentences" type="number" value="3" min="1" max="10" />
+            </label>
+          </div>
+
+          <button type="submit" class="primary" id="analyze-btn">Analyze</button>
+        </form>
+
+        <!-- Example texts for quick testing -->
+        <div class="examples">
+          <p class="examples-label">Try an example:</p>
+          <button class="ghost example-btn" data-example="bug">Bug report</button>
+          <button class="ghost example-btn" data-example="feature">Feature request</button>
+          <button class="ghost example-btn" data-example="billing">Billing issue</button>
+          <button class="ghost example-btn" data-example="praise">Praise</button>
+        </div>
+      </section>
+
+      <!-- RIGHT: Results panel -->
+      <section class="card wide">
+        <div class="card-header">
+          <h2>Results</h2>
+          <span class="count" id="analysis-status"></span>
+        </div>
+
+        <div id="analysis-results" class="results-area">
+          <div class="empty">Submit text on the left to see analysis results here.</div>
+        </div>
       </section>
     </main>
 

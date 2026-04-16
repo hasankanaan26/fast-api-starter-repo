@@ -4,8 +4,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
 
 WORKDIR /app
 
-ENV UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1
+ARG UV_LINK_MODE=copy
+ARG UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=${UV_LINK_MODE} \
+    UV_COMPILE_BYTECODE=${UV_COMPILE_BYTECODE}
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev

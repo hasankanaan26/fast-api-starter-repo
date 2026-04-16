@@ -18,7 +18,7 @@ Usage:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import tasks, chat, assignees
+from app.routers import ask, chat_local, tasks, assignees, structured, pipeline
 
 
 # Create the FastAPI application instance.
@@ -56,7 +56,18 @@ app.include_router(assignees.router)
 
 # Register the chat router — adds POST /chat, which proxies messages to a local
 # Ollama model using the OLLAMA_BASE_URL and OLLAMA_MODEL values from .env.
-app.include_router(chat.router)
+app.include_router(chat_local.router)
+
+
+app.include_router(ask.router)
+
+# Register the structured analysis router — adds POST /analyze/sentiment,
+# /analyze/summarize, and /analyze/classify using native structured outputs.
+app.include_router(structured.router)
+
+# Register the pipeline router — adds POST /pipeline/analyze, a 3-step
+# classify → extract → summarize pipeline for document analysis.
+app.include_router(pipeline.router)
 
 
 # The @app.get("/health") line is a "decorator" — it tells FastAPI:

@@ -11,7 +11,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
-from app.schemas.chat import ChatMessage
+from app.models import ChatMessage
 
 
 async def chat_completion(messages: list[ChatMessage]) -> tuple[str, str]:

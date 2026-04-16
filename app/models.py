@@ -29,7 +29,7 @@ Usage:
     response = TaskResponse(id=1, title="Buy groceries", description="Milk, eggs, bread")
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -293,6 +293,122 @@ class AssigneeResponse(Assignee):
             ]
         }
     }
+
+
+class Question(BaseModel):
+    """Request body for the /ask endpoint."""
+
+    question: str = Field(..., description="The user's question for the LLM.", min_length=1)
+
+
+class Answer(BaseModel):
+    """Response body for the /ask endpoint."""
+
+    answer: str = Field(..., description="The LLM's answer text.")
+    model: str = Field(..., description="The model that produced the answer.")
+
+
+class ChatMessage(BaseModel):
+    """A single message in a chat conversation."""
+
+    role: Literal["system", "user", "assistant"] = Field(
+        ...,
+        description="Who sent the message: 'system', 'user', or 'assistant'.",
+    )
+    content: str = Field(..., description="The text content of the message.")
+
+
+class ChatResponse(BaseModel):
+    """Response body for the /chat endpoint."""
+
+    model: str = Field(..., description="The model that produced the reply.")
+    message: ChatMessage = Field(..., description="The assistant's reply message.")
+
+
+# --- Checkpoint 2 models: Structured analysis ---
+
+
+class AnalyzeRequest(BaseModel):
+    """Request body for sentiment analysis — just the text to analyze."""
+
+    text: str
+
+
+class SentimentResult(BaseModel):
+    """Structured sentiment analysis result returned by the LLM."""
+
+    sentiment: str
+    confidence: float
+    reasoning: str
+
+
+class SummaryRequest(BaseModel):
+    """Request body for summarization — text plus an optional sentence cap."""
+
+    text: str
+    max_sentences: int = 3
+
+
+class SummaryResult(BaseModel):
+    """Structured summarization result returned by the LLM."""
+
+    summary: str
+    sentence_count: int
+
+
+class ClassifyRequest(BaseModel):
+    """Request body for ticket classification."""
+
+    text: str
+
+
+class ClassifyResult(BaseModel):
+    """Structured classification result returned by the LLM."""
+
+    category: str
+    confidence: float
+    reasoning: str
+
+
+# --- Checkpoint 3 models: LLM Pipeline ---
+
+
+class PipelineRequest(BaseModel):
+    """Request body for the multi-step document analysis pipeline."""
+
+    text: str
+
+
+class ClassificationStep(BaseModel):
+    """Step 1 output — what category does this document belong to?"""
+
+    category: str
+    confidence: float
+    reasoning: str
+
+
+class KeyValuePair(BaseModel):
+    """A single extracted field from the document."""
+
+    key: str
+    value: str
+
+
+class ExtractionResult(BaseModel):
+    """Step 2 output — category-specific fields pulled from the document."""
+
+    fields: list[KeyValuePair]
+
+
+class PipelineResult(BaseModel):
+    """Full pipeline output with all intermediate steps visible."""
+
+    input_text: str
+    classification: ClassificationStep | None = None
+    extraction: ExtractionResult | None = None
+    summary: str = ""
+    steps_completed: int = 0
+    error: str | None = None
 
 
 class TaskResponse(Task):

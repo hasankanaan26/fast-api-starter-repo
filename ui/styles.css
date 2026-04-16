@@ -60,8 +60,49 @@ html, body {
 .dot.ok { background: var(--success); }
 .dot.err { background: var(--danger); }
 
-.layout {
+/* ---- Tabs ---- */
+
+.tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 32px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  font: inherit;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 12px 20px;
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
   display: grid;
+}
+
+/* ---- Layout ---- */
+
+.layout {
   grid-template-columns: 320px 1fr;
   gap: 24px;
   padding: 24px 32px;
@@ -69,8 +110,17 @@ html, body {
   margin: 0 auto;
 }
 
+.analysis-layout {
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  padding: 24px 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 @media (max-width: 780px) {
-  .layout {
+  .layout,
+  .analysis-layout {
     grid-template-columns: 1fr;
     padding: 16px;
   }
@@ -167,6 +217,11 @@ button.primary {
 }
 
 button.primary:hover { background: var(--primary-hover); }
+
+button.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 button.ghost {
   background: transparent;
@@ -303,4 +358,166 @@ button.ghost.danger:hover {
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 10px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ---- Analysis-specific styles ---- */
+
+.sub-options {
+  padding-left: 8px;
+  border-left: 2px solid var(--border);
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.examples-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  width: 100%;
+}
+
+.example-btn {
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.example-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Results area */
+
+.results-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+.result-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.result-section-header {
+  background: var(--bg);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.result-section-body {
+  padding: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-badge.done {
+  background: var(--success);
+}
+
+.step-badge.fail {
+  background: var(--danger);
+}
+
+.field-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.field-table th,
+.field-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.field-table th {
+  color: var(--muted);
+  font-weight: 500;
+  width: 140px;
+}
+
+.confidence-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidence-bar .bar {
+  width: 80px;
+  height: 6px;
+  background: var(--bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.confidence-bar .bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--primary);
+  transition: width 0.3s;
+}
+
+.summary-text {
+  background: var(--bg);
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 3px solid var(--primary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.error-text {
+  color: var(--danger);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border-radius: 6px;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

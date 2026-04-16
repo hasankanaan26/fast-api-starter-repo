@@ -5,6 +5,7 @@
 //   2. Keeps an in-memory cache of tasks and assignees so we can re-render
 //      filters client-side without re-fetching on every keystroke.
 //   3. Wires up form submits, delete/toggle buttons, and the search box.
+//   4. Provides a Document Analysis UI for the LLM pipeline endpoints.
 
 const API_BASE = "http://localhost:8000";
 
@@ -18,20 +19,19 @@ async function request(path, options = {}) {
     ...options,
   });
   if (!res.ok) {
-    // Try to surface FastAPI's {"detail": "..."} error message.
     let detail = res.statusText;
     try {
       const body = await res.json();
       if (body.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
-    } catch (_) { /* ignore — body wasn't JSON */ }
+    } catch (_) { /* ignore */ }
     throw new Error(detail);
   }
-  // DELETE endpoints return JSON too, but 204-style empty bodies are possible.
   if (res.status === 204) return null;
   return res.json();
 }
 
 const api = {
+  // Existing task/assignee endpoints
   health:            ()        => request("/health"),
   listTasks:         ()        => request("/tasks"),
   createTask:        (body)    => request("/tasks", { method: "POST", body: JSON.stringify(body) }),
@@ -40,10 +40,16 @@ const api = {
   listAssignees:     ()        => request("/assignees"),
   createAssignee:    (body)    => request("/assignees", { method: "POST", body: JSON.stringify(body) }),
   deleteAssignee:    (id)      => request(`/assignees/${id}`, { method: "DELETE" }),
+
+  // Document analysis endpoints (Checkpoint 2 + 3)
+  analyzePipeline:   (text)    => request("/pipeline/analyze", { method: "POST", body: JSON.stringify({ text }) }),
+  analyzeSentiment:  (text)    => request("/analyze/sentiment", { method: "POST", body: JSON.stringify({ text }) }),
+  analyzeSummarize:  (text, n) => request("/analyze/summarize", { method: "POST", body: JSON.stringify({ text, max_sentences: n }) }),
+  analyzeClassify:   (text)    => request("/analyze/classify", { method: "POST", body: JSON.stringify({ text }) }),
 };
 
 // -----------------------------------------------------------------------------
-// State — cached responses plus the current search/filter controls.
+// State
 // -----------------------------------------------------------------------------
 
 const state = {
@@ -68,8 +74,6 @@ function showToast(msg, isError = false) {
   showToast._t = setTimeout(() => { el.hidden = true; }, 2600);
 }
 
-// Escape text before injecting into innerHTML, so a task titled
-// "<img onerror=...>" renders as text instead of executing.
 function esc(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -86,7 +90,21 @@ function assigneeName(id) {
 }
 
 // -----------------------------------------------------------------------------
-// Rendering
+// Tab switching
+// -----------------------------------------------------------------------------
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+    tab.classList.add("active");
+    const target = document.getElementById("tab-" + tab.dataset.tab);
+    if (target) target.classList.add("active");
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Rendering — Tasks & Assignees
 // -----------------------------------------------------------------------------
 
 function renderAssignees() {
@@ -103,13 +121,12 @@ function renderAssignees() {
           <div class="desc">${esc(a.email)}</div>
         </div>
         <div class="actions">
-          <button class="ghost danger" data-action="delete-assignee" data-id="${a.id}" title="Delete">✕</button>
+          <button class="ghost danger" data-action="delete-assignee" data-id="${a.id}" title="Delete">&#10005;</button>
         </div>
       </li>
     `).join("");
   }
 
-  // Refresh the two assignee dropdowns (create-task form + filter).
   const options = ['<option value="">— Unassigned —</option>']
     .concat(state.assignees.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`))
     .join("");
@@ -159,11 +176,137 @@ function renderTasks() {
           <div class="meta">${badge}</div>
         </div>
         <div class="actions">
-          <button class="ghost danger" data-action="delete-task" data-id="${t.id}" title="Delete">✕</button>
+          <button class="ghost danger" data-action="delete-task" data-id="${t.id}" title="Delete">&#10005;</button>
         </div>
       </li>
     `;
   }).join("");
+}
+
+// -----------------------------------------------------------------------------
+// Rendering — Document Analysis Results
+// -----------------------------------------------------------------------------
+
+function confidenceHtml(value) {
+  const pct = Math.round(value * 100);
+  return `
+    <span class="confidence-bar">
+      <span class="bar"><span class="bar-fill" style="width:${pct}%"></span></span>
+      ${pct}%
+    </span>
+  `;
+}
+
+function renderPipelineResult(data) {
+  const area = $("analysis-results");
+  let html = "";
+
+  // Step 1: Classification
+  const step1Class = data.steps_completed >= 1 ? "done" : "fail";
+  html += `<div class="result-section">
+    <div class="result-section-header">
+      <span class="step-badge ${step1Class}">1</span> Classification
+    </div>
+    <div class="result-section-body">`;
+
+  if (data.classification) {
+    html += `<table class="field-table">
+      <tr><th>Category</th><td><span class="badge">${esc(data.classification.category)}</span></td></tr>
+      <tr><th>Confidence</th><td>${confidenceHtml(data.classification.confidence)}</td></tr>
+      <tr><th>Reasoning</th><td>${esc(data.classification.reasoning)}</td></tr>
+    </table>`;
+  } else {
+    html += `<div class="error-text">Classification did not complete.</div>`;
+  }
+  html += `</div></div>`;
+
+  // Step 2: Extraction
+  const step2Class = data.steps_completed >= 2 ? "done" : (data.steps_completed >= 1 ? "fail" : "fail");
+  html += `<div class="result-section">
+    <div class="result-section-header">
+      <span class="step-badge ${step2Class}">2</span> Extracted Fields
+    </div>
+    <div class="result-section-body">`;
+
+  if (data.extraction && data.extraction.fields && data.extraction.fields.length > 0) {
+    html += `<table class="field-table">`;
+    for (const f of data.extraction.fields) {
+      html += `<tr><th>${esc(f.key)}</th><td>${esc(f.value)}</td></tr>`;
+    }
+    html += `</table>`;
+  } else if (data.steps_completed < 2) {
+    html += `<div class="error-text">Extraction did not complete.</div>`;
+  } else {
+    html += `<p>No fields extracted.</p>`;
+  }
+  html += `</div></div>`;
+
+  // Step 3: Summary
+  const step3Class = data.steps_completed >= 3 ? "done" : "fail";
+  html += `<div class="result-section">
+    <div class="result-section-header">
+      <span class="step-badge ${step3Class}">3</span> Summary
+    </div>
+    <div class="result-section-body">`;
+
+  if (data.summary) {
+    html += `<div class="summary-text">${esc(data.summary)}</div>`;
+  } else {
+    html += `<div class="error-text">Summary was not generated.</div>`;
+  }
+  html += `</div></div>`;
+
+  // Error (if any)
+  if (data.error) {
+    html += `<div class="result-section">
+      <div class="result-section-header" style="color:var(--danger)">Error</div>
+      <div class="result-section-body"><div class="error-text">${esc(data.error)}</div></div>
+    </div>`;
+  }
+
+  area.innerHTML = html;
+  $("analysis-status").textContent = `${data.steps_completed}/3 steps`;
+}
+
+function renderSentimentResult(data) {
+  const area = $("analysis-results");
+  area.innerHTML = `<div class="result-section">
+    <div class="result-section-header">Sentiment Analysis</div>
+    <div class="result-section-body">
+      <table class="field-table">
+        <tr><th>Sentiment</th><td><span class="badge">${esc(data.sentiment)}</span></td></tr>
+        <tr><th>Confidence</th><td>${confidenceHtml(data.confidence)}</td></tr>
+        <tr><th>Reasoning</th><td>${esc(data.reasoning)}</td></tr>
+      </table>
+    </div>
+  </div>`;
+  $("analysis-status").textContent = "Done";
+}
+
+function renderSummaryResult(data) {
+  const area = $("analysis-results");
+  area.innerHTML = `<div class="result-section">
+    <div class="result-section-header">Summary (${data.sentence_count} sentence${data.sentence_count !== 1 ? "s" : ""})</div>
+    <div class="result-section-body">
+      <div class="summary-text">${esc(data.summary)}</div>
+    </div>
+  </div>`;
+  $("analysis-status").textContent = "Done";
+}
+
+function renderClassifyResult(data) {
+  const area = $("analysis-results");
+  area.innerHTML = `<div class="result-section">
+    <div class="result-section-header">Ticket Classification</div>
+    <div class="result-section-body">
+      <table class="field-table">
+        <tr><th>Category</th><td><span class="badge">${esc(data.category)}</span></td></tr>
+        <tr><th>Confidence</th><td>${confidenceHtml(data.confidence)}</td></tr>
+        <tr><th>Reasoning</th><td>${esc(data.reasoning)}</td></tr>
+      </table>
+    </div>
+  </div>`;
+  $("analysis-status").textContent = "Done";
 }
 
 // -----------------------------------------------------------------------------
@@ -196,7 +339,18 @@ async function checkHealth() {
 }
 
 // -----------------------------------------------------------------------------
-// Event wiring
+// Example texts for the Document Analysis tab
+// -----------------------------------------------------------------------------
+
+const EXAMPLES = {
+  bug: `The export button throws a 500 error every time I click it. Started happening yesterday after the latest deployment. I've tried refreshing the page and clearing my cache, but the issue persists. This is blocking our end-of-month reporting.`,
+  feature: `It would be amazing if we could schedule reports to be generated automatically every Monday morning. Right now I have to manually run them, which takes about 30 minutes of my time each week. This would save our entire team hours per month.`,
+  billing: `I was charged $49.99 twice on March 15th for my Pro subscription. I only have one account and should only be billed once. I'd like a refund for the duplicate charge as soon as possible.`,
+  praise: `I just wanted to say that Sarah from your support team was absolutely fantastic. She helped me migrate my entire workspace in under an hour and even stayed late to make sure everything was working perfectly. Best support experience I've ever had!`,
+};
+
+// -----------------------------------------------------------------------------
+// Event wiring — Tasks & Assignees
 // -----------------------------------------------------------------------------
 
 $("assignee-form").addEventListener("submit", async (e) => {
@@ -222,8 +376,6 @@ $("task-form").addEventListener("submit", async (e) => {
   const description = $("task-description").value.trim();
   const assigneeRaw = $("task-assignee").value;
 
-  // Build the payload — only include assignee_id if the user actually picked one.
-  // The API treats omission as "unassigned".
   const payload = { title, description };
   if (assigneeRaw !== "") payload.assignee_id = Number(assigneeRaw);
 
@@ -238,7 +390,6 @@ $("task-form").addEventListener("submit", async (e) => {
   }
 });
 
-// Single delegated click handler for everything inside the two lists.
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest("[data-action]");
   if (!btn) return;
@@ -254,7 +405,6 @@ document.addEventListener("click", async (e) => {
     } else if (action === "delete-assignee") {
       await api.deleteAssignee(id);
       state.assignees = state.assignees.filter((a) => a.id !== id);
-      // Any tasks assigned to this person were unassigned server-side — mirror that locally.
       state.tasks = state.tasks.map((t) => (t.assignee_id === id ? { ...t, assignee_id: null } : t));
       renderAssignees();
       renderTasks();
@@ -267,7 +417,6 @@ document.addEventListener("click", async (e) => {
     }
   } catch (err) {
     showToast(err.message, true);
-    // Re-sync with server in case local state drifted.
     refreshAll();
   }
 });
@@ -280,6 +429,68 @@ $("task-search").addEventListener("input", (e) => {
 $("task-filter-assignee").addEventListener("change", (e) => {
   state.filterAssigneeId = e.target.value;
   renderTasks();
+});
+
+// -----------------------------------------------------------------------------
+// Event wiring — Document Analysis
+// -----------------------------------------------------------------------------
+
+// Show/hide the "max sentences" option based on analysis type
+$("analysis-type").addEventListener("change", () => {
+  const isSummarize = $("analysis-type").value === "summarize";
+  $("summarize-options").hidden = !isSummarize;
+});
+
+// Fill textarea with example text
+document.querySelectorAll(".example-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.example;
+    if (EXAMPLES[key]) {
+      $("analysis-text").value = EXAMPLES[key];
+    }
+  });
+});
+
+// Submit analysis
+$("analysis-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("analysis-text").value.trim();
+  if (!text) return;
+
+  const type = $("analysis-type").value;
+  const btn = $("analyze-btn");
+  const area = $("analysis-results");
+
+  // Show loading state
+  btn.disabled = true;
+  btn.textContent = "Analyzing…";
+  area.innerHTML = `<div class="empty"><span class="spinner"></span> Running analysis…</div>`;
+  $("analysis-status").textContent = "Working…";
+
+  try {
+    if (type === "pipeline") {
+      const result = await api.analyzePipeline(text);
+      renderPipelineResult(result);
+    } else if (type === "sentiment") {
+      const result = await api.analyzeSentiment(text);
+      renderSentimentResult(result);
+    } else if (type === "summarize") {
+      const maxSentences = parseInt($("analysis-max-sentences").value, 10) || 3;
+      const result = await api.analyzeSummarize(text, maxSentences);
+      renderSummaryResult(result);
+    } else if (type === "classify") {
+      const result = await api.analyzeClassify(text);
+      renderClassifyResult(result);
+    }
+    showToast("Analysis complete");
+  } catch (err) {
+    area.innerHTML = `<div class="error-text">Analysis failed: ${esc(err.message)}</div>`;
+    $("analysis-status").textContent = "Error";
+    showToast(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Analyze";
+  }
 });
 
 // -----------------------------------------------------------------------------
